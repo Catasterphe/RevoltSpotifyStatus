@@ -45,7 +45,10 @@ async fn main() {
                 Ok(currently_playing) => {
                     if let Some(track) = currently_playing.item {
                         let artist_names: Vec<&str> = track.artists.iter().map(|a| a.name.as_str()).collect();
-                        let status_text = format!("Currently playing: {} by {}", track.name, artist_names.join(", "));
+                        let mut status_text = format!("Listening to '{}' by '{}'", track.name, artist_names.join(", "));
+                        if status_text.len() > 128 {
+                            status_text = format!("Listening to '{}' by '{}'", track.name, artist_names[0]);
+                        }
                         println!("{}", status_text);
     
                         if let Err(e) = update_revolt_status(&status_text).await {
