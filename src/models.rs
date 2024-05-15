@@ -7,6 +7,7 @@ pub struct OAuthResponse {
 
 #[derive(Deserialize)]
 pub struct CurrentlyPlaying {
+    pub progress_ms: i32,
     pub item: Option<Track>,
 }
 
@@ -14,6 +15,7 @@ pub struct CurrentlyPlaying {
 pub struct Track {
     pub name: String,
     pub artists: Vec<Artist>,
+    pub duration_ms: i32,
 }
 
 #[derive(Deserialize)]

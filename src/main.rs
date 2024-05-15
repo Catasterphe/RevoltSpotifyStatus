@@ -11,7 +11,7 @@ use std::{io::{self, Write}, thread, time::Duration};
 async fn main() {
     println!("Go to the following URL to authorize the application:");
     let auth_url = format!(
-        "https://accounts.spotify.com/authorize?client_id={}&response_type=code&redirect_uri={}&scope=user-read-playback-state",
+        "https://accounts.spotify.com/authorize?client_id={}&response_type=code&redirect_uri={}&scope=user-read-currently-playing",
         CLIENT_ID, REDIRECT_URI
     );
     println!("{}", auth_url);
@@ -50,6 +50,9 @@ async fn main() {
     
                         if let Err(e) = update_revolt_status(&status_text).await {
                             eprintln!("Error updating Revolt status: {}", e);
+                        } else {
+                            // wait the amount of time the song has left Plus 3 seconds just incase spotify has some weird shit happen?
+                            thread::sleep(Duration::from_millis((track.duration_ms - currently_playing.progress_ms + 3000).try_into().expect("erm")));
                         }
                     } else {
                         println!("No track is currently playing.");
@@ -57,6 +60,5 @@ async fn main() {
                 }
                 Err(e) => eprintln!("Error: {}", e),
             }
-            thread::sleep(Duration::from_secs(45));
         }
 }
