@@ -1,14 +1,15 @@
-use crate::fake_env::{BASE_API, LOGIN_API, REVOLT_USER_ID, REVOLT_USER_TOKEN};
+use crate::fake_env::{BASE_API, CLIENT_ID, CLIENT_SECRET, LOGIN_API, REVOLT_USER_ID, REVOLT_USER_TOKEN};
 use crate::models::{CurrentlyPlaying, OAuthResponse};
-use reqwest::Client;
+use reqwest::{Client, StatusCode};
 use std::error::Error;
+use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 
 pub async fn get_access_token(
     client_id: &str,
     client_secret: &str,
     auth_code: &str,
     redirect_uri: &str,
-) -> Result<String, Box<dyn Error>> {
+) -> Result<OAuthResponse, Box<dyn Error>> {
     let client = Client::new();
 
     let params = [
@@ -23,7 +24,7 @@ pub async fn get_access_token(
 
     if response.status().is_success() {
         let token_response: OAuthResponse = response.json().await?;
-        Ok(token_response.access_token)
+        Ok(token_response)
     } else {
         Err(Box::new(std::io::Error::new(
             std::io::ErrorKind::Other,
@@ -32,14 +33,48 @@ pub async fn get_access_token(
     }
 }
 
-pub async fn get_playing_song(client: &Client) -> Result<CurrentlyPlaying, Box<dyn Error>> {
-    let response = client.get(BASE_API).send().await?;
+pub async fn refresh_access_token(client: &Client, refresh_token: &str) -> Result<OAuthResponse, Box<dyn Error>> {
+    println!("{refresh_token}");
+    let params = [
+        ("grant_type", "refresh_token"),
+        ("refresh_token", refresh_token),
+    ];
+
+    let auth_value = format!(
+        "Basic {}",
+        STANDARD_NO_PAD.encode(format!("{}:{}", CLIENT_ID, CLIENT_SECRET))
+    );
+
+    let response = client
+        .post(LOGIN_API)
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .header("Authorization", auth_value)
+        .form(&params)
+        .send()
+        .await?;
 
     if response.status().is_success() {
-        let currently_playing: CurrentlyPlaying = response.json().await?;
-        Ok(currently_playing)
+        let oauth_response: OAuthResponse = response.json().await?;
+        Ok(oauth_response)
     } else {
         Err(Box::new(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("Failed to refresh token: {}", response.status()),
+        )))
+    }
+}
+
+pub async fn get_playing_song(client: &Client) -> Result<Option<CurrentlyPlaying>, Box<dyn Error>> {
+    let response = client.get(BASE_API).send().await?;
+
+    match response.status() {
+        StatusCode::OK => {
+            let currently_playing: CurrentlyPlaying = response.json().await?;
+            return Ok(Some(currently_playing));
+        },
+        StatusCode::NO_CONTENT => return Ok(None),
+        StatusCode::UNAUTHORIZED => return Err("TOKEN_EXPIRED".into()),
+        _ => return Err(Box::new(std::io::Error::new(
             std::io::ErrorKind::Other,
             format!("Failed to get current song: {}", response.text().await?),
         )))
