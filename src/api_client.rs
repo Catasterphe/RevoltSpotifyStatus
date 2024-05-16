@@ -1,9 +1,14 @@
-use reqwest::{Client};
-use crate::fake_env::{LOGIN_API, BASE_API, REVOLT_USER_TOKEN, REVOLT_USER_ID};
-use crate::models::{OAuthResponse, CurrentlyPlaying};
+use crate::fake_env::{BASE_API, LOGIN_API, REVOLT_USER_ID, REVOLT_USER_TOKEN};
+use crate::models::{CurrentlyPlaying, OAuthResponse};
+use reqwest::Client;
 use std::error::Error;
 
-pub async fn get_access_token(client_id: &str, client_secret: &str, auth_code: &str, redirect_uri: &str) -> Result<String, Box<dyn Error>> {
+pub async fn get_access_token(
+    client_id: &str,
+    client_secret: &str,
+    auth_code: &str,
+    redirect_uri: &str,
+) -> Result<String, Box<dyn Error>> {
     let client = Client::new();
 
     let params = [
@@ -14,10 +19,7 @@ pub async fn get_access_token(client_id: &str, client_secret: &str, auth_code: &
         ("client_secret", client_secret),
     ];
 
-    let response = client.post(LOGIN_API)
-        .form(&params)
-        .send()
-        .await?;
+    let response = client.post(LOGIN_API).form(&params).send().await?;
 
     if response.status().is_success() {
         let token_response: OAuthResponse = response.json().await?;
@@ -55,7 +57,8 @@ pub async fn update_revolt_status(status_text: &str) -> Result<(), Box<dyn Error
         }
     });
 
-    let response = client.patch(&url)
+    let response = client
+        .patch(&url)
         .header("x-session-token", REVOLT_USER_TOKEN)
         .json(&body)
         .send()

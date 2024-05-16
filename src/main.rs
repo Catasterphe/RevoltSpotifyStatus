@@ -1,11 +1,15 @@
-mod fake_env;
 mod api_client;
+mod fake_env;
 mod models;
 
 use api_client::{get_access_token, get_playing_song, update_revolt_status};
 use fake_env::{CLIENT_ID, CLIENT_SECRET, REDIRECT_URI};
 use reqwest::header;
-use std::{io::{self, Write}, thread, time::Duration};
+use std::{
+    io::{self, Write},
+    thread,
+    time::Duration,
+};
 
 #[tokio::main]
 async fn main() {
@@ -31,7 +35,8 @@ async fn main() {
     };
 
     let mut headers = header::HeaderMap::new();
-    let mut auth_value = header::HeaderValue::from_str(format!("Bearer {}", access_token).as_str()).expect("Invalid header value");
+    let mut auth_value = header::HeaderValue::from_str(format!("Bearer {}", access_token).as_str())
+        .expect("Invalid header value");
     auth_value.set_sensitive(true);
     headers.insert(header::AUTHORIZATION, auth_value);
 
@@ -40,28 +45,38 @@ async fn main() {
         .build()
         .expect("Could not build client!");
 
-        loop {
-            match get_playing_song(&client).await {
-                Ok(currently_playing) => {
-                    if let Some(track) = currently_playing.item {
-                        let artist_names: Vec<&str> = track.artists.iter().map(|a| a.name.as_str()).collect();
-                        let mut status_text = format!("Listening to '{}' by '{}'", track.name, artist_names.join(", "));
-                        if status_text.len() > 128 {
-                            status_text = format!("Listening to '{}' by '{}'", track.name, artist_names[0]);
-                        }
-                        println!("{}", status_text);
-    
-                        if let Err(e) = update_revolt_status(&status_text).await {
-                            eprintln!("Error updating Revolt status: {}", e);
-                        } else {
-                            // wait the amount of time the song has left Plus 3 seconds just incase spotify has some weird shit happen?
-                            thread::sleep(Duration::from_millis((track.duration_ms - currently_playing.progress_ms + 3000).try_into().expect("erm")));
-                        }
-                    } else {
-                        println!("No track is currently playing.");
+    loop {
+        match get_playing_song(&client).await {
+            Ok(currently_playing) => {
+                if let Some(track) = currently_playing.item {
+                    let artist_names: Vec<&str> =
+                        track.artists.iter().map(|a| a.name.as_str()).collect();
+                    let mut status_text = format!(
+                        "Listening to '{}' by '{}'",
+                        track.name,
+                        artist_names.join(", ")
+                    );
+                    if status_text.len() > 128 {
+                        status_text =
+                            format!("Listening to '{}' by '{}'", track.name, artist_names[0]);
                     }
+                    println!("{}", status_text);
+
+                    if let Err(e) = update_revolt_status(&status_text).await {
+                        eprintln!("Error updating Revolt status: {}", e);
+                    } else {
+                        // wait the amount of time the song has left Plus 3 seconds just incase spotify has some weird shit happen?
+                        thread::sleep(Duration::from_millis(
+                            (track.duration_ms - currently_playing.progress_ms + 3000)
+                                .try_into()
+                                .expect("erm"),
+                        ));
+                    }
+                } else {
+                    println!("No track is currently playing.");
                 }
-                Err(e) => eprintln!("Error: {}", e),
             }
+            Err(e) => eprintln!("Error: {}", e),
         }
+    }
 }
